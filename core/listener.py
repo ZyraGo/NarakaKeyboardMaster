@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding:utf-8 -*-
-
+import json
+import os
 import re
 import time
 import pprint
@@ -21,10 +22,6 @@ class recorder:
             self,
             start_record_key='f7',
             stop_record_key='f7',
-            start_repeat_key='f8',
-            stop_repeat_key='f8',
-            start_repeats_key='f9',
-            stop_repeats_key='f9',
             close_key='esc',
             debug=True,
             debug_info=False,
@@ -36,20 +33,12 @@ class recorder:
         self.debug_info = debug_info
         self.start_record_key = start_record_key
         self.stop_record_key = stop_record_key
-        self.start_repeat_key = start_repeat_key
-        self.stop_repeat_key = stop_repeat_key
-        self.start_repeats_key = start_repeats_key
-        self.stop_repeats_key = stop_repeats_key
         self.close_key = close_key
         self.record_status = 'stop'  # only [start or stop]
         self.repeat_status = 'stop'  # only [start or stop]
         self.unrecord_key = [
             self.start_record_key,
             self.stop_record_key,
-            self.start_repeat_key,
-            self.stop_repeat_key,
-            self.start_repeats_key,
-            self.stop_repeats_key,
             self.close_key,
         ]
         self.outclass = outclass
@@ -169,14 +158,9 @@ class recorder:
                         getattr(keyboard, action['action'])(action['key'])
                 if self.speed: time.sleep(gtime / self.speed)
                 action_start_time = action['time']
-        self.hook_repeat_stop('force_stop')
 
     def hook_record_start(self, key):
         if key == getattr(Key, self.start_record_key) and self.record_status == 'stop':
-            try:
-                self.hook_repeat_stop('force_stop')
-            except:
-                traceback.print_exc()
             self.record_status = 'start'
             threading.Thread(target=self.start_record).start()
             if self.debug: print('{} record start.'.format(key))
@@ -191,23 +175,8 @@ class recorder:
             if self.debug: print('{} record stop.'.format(key))
             return True
 
-    def hook_repeat_start(self, key):
-        if (key == getattr(Key, self.start_repeat_key) or key == getattr(Key, self.start_repeats_key)) \
-                and self.repeat_status == 'stop':
-            if self.record_status == 'start': self.hook_record_stop('force_stop')
-            self.repeat_status = 'start'
-            args = (1,) if key == getattr(Key, self.start_repeat_key) else (100000000,)
-            threading.Thread(target=self.repeat_times, args=args).start()
-            if self.debug: print('{} repeat start.'.format(key))
-            return True
 
-    def hook_repeat_stop(self, key):
-        if ((key == getattr(Key, self.stop_repeat_key) or key == getattr(Key, self.stop_repeats_key)) \
-            and self.repeat_status == 'start') or key == 'force_stop':
-            self.repeat_status = 'stop'
-            self.repeat_stop_toggle = True
-            if self.debug: print('{} repeat stop.'.format(key))
-            return True
+
 
     def hook_main_stop(self, key):
         if (key == getattr(Key, self.close_key)) or key == 'force_stop':
@@ -229,7 +198,6 @@ class recorder:
 
     def main_keybord(self, key):
         self.hook_record_start(key) or self.hook_record_stop(key)
-        self.hook_repeat_start(key) or self.hook_repeat_stop(key)
         self.hook_outclass(key)
         if self.hook_main_stop(key):
             self.hook_outclass_stop(key)
@@ -256,8 +224,6 @@ hidden = True
 info = '''
 录制工具方法介绍：
 F7  开始/停止录制
-F8  执行/停止录制好的任务
-F9  执行/停止录制好的任务(重复执行)
 F10 生成代码
 ESC 关闭工具
 '''.strip()
@@ -316,7 +282,7 @@ class recorder_gui:
         self.root = tkinter.Tk()
         self.root.title("键盘鼠标操作录制工具")
         # Button(self.root, text='置顶',command=self.topWin).pack(side=tkinter.TOP, padx=3)
-        self.key_hook = {'f10': self.create_code}
+        self.key_hook = {'f10': self.sync_record}
         # 这里 outclass 是为了能在 recorder 内的关闭函数中接收关闭信号函数
         self.recorder = recorder(outclass=self)
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -342,7 +308,7 @@ class recorder_gui:
         self.cbx2.pack(side=tkinter.RIGHT)
         self.cbx2.bind('<<ComboboxSelected>>', self.change_shift_diff)
         Button(self.root, text='注意事项', command=self.create_warning).pack(fill=tkinter.X)
-        Button(self.root, text='生成代码', command=self.create_code).pack(fill=tkinter.X)
+        Button(self.root, text='生成代码', command=self.sync_record).pack(fill=tkinter.X)
         self.txt = Text(self.root, width=30, height=11, font=self.ft)
         self.txt.pack(fill=tkinter.BOTH, expand=True)
         global print
@@ -360,7 +326,6 @@ class recorder_gui:
         tp.attributes('-topmost', True)
 
     def _recorder_close(self):
-        self.recorder.hook_repeat_stop('force_stop')
         self.recorder.hook_record_stop('force_stop')
         self.recorder.hook_main_stop('force_stop')
 
@@ -379,23 +344,33 @@ class recorder_gui:
         threading.Thread(target=self.recorder.start).start()
         self.root.mainloop()
 
-    def create_code(self):
+    def sync_record(self):
         self.recorder.hook_record_stop('force_stop')
-        self.recorder.hook_repeat_stop('force_stop')
 
-        def format_record_data(record_data):
-            _filter = lambda string: string.group(0).rsplit(':', 1)[0].replace('<', '') + ','
-            record_data = re.sub(r"'key': <[^\n]+>,", _filter, record_data)
-            record_data = re.sub(r"'button': <[^\n]+>,", _filter, record_data)
-            return record_data
 
-        unrecord_key = str(list(set(self.recorder.unrecord_key)))
-        record_data = format_record_data(pprint.pformat(self.recorder.record, indent=2, width=200))
-        self.clear_txt()
-        speed = 'None' if self.cbx.get() == 'None' else self.cbx.get()
-        print(record_code.replace('$record_data', record_data)
-              .replace('$unrecord_key', unrecord_key)
-              .replace('$speed', speed))
+
+        #将记录的按键信息封装到文本中
+        def sync_record(self):
+            self.recorder.hook_record_stop('force_stop')
+
+            unrecord_key = str(list(set(self.recorder.unrecord_key)))
+            record_data = self.recorder.record
+            self.clear_txt()
+            speed = 'None' if self.cbx.get() == 'None' else self.cbx.get()
+            self.save_to_json(record_data, unrecord_key, speed)
+
+        def save_to_json(self, record_data, unrecord_key, speed):
+            timestamp = int(time.time())
+            filename = f"record_data_{timestamp}.json"
+            data = {
+                "record_data": record_data,
+                "unrecord_key": unrecord_key,
+                "speed": speed
+            }
+            with open(filename, "w") as json_file:
+                json.dump(data, json_file, indent=2)
+            print(f"Record data saved to {filename}")
+            print(f"{ os.path.abspath(filename)}")
 
     def create_warning(self):
         self.clear_txt()
