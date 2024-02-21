@@ -175,9 +175,6 @@ class recorder:
             if self.debug: print('{} record stop.'.format(key))
             return True
 
-
-
-
     def hook_main_stop(self, key):
         if (key == getattr(Key, self.close_key)) or key == 'force_stop':
             if self.main_keybord_thread: self.main_keybord_thread.stop()
@@ -234,46 +231,6 @@ warning = '''
 方法:在代码中左右 shift 同时按,实现选中文本
 为兼容，默认每次同时按下左右 shift
 若取消，将 “是否区分左右shift” 设置为“是”即可
-'''.strip()
-
-record_code = '''
-#!/usr/bin/python
-# -*- coding:utf-8 -*-
-import time
-from pynput.keyboard import Key
-from pynput.keyboard import Controller as kcontroller
-from pynput.mouse import Controller as mcontroller
-from pynput.mouse import Button
-record_data = $record_data
-def repeat_times(record_data, times=1, speed=1.0):
-    mouse = mcontroller()
-    keyboard = kcontroller()
-    for _ in range(times):
-        if not record_data:
-            print('error empty record.')
-            return
-        action_start_time = record_data[0]['time']
-        for idx,action in enumerate(record_data):
-            gtime = action['time'] - action_start_time
-            if gtime < 0.02 and idx != 0 and action['action'] == 'move':
-                # 针对鼠标移动的稍稍优化
-                continue 
-            if action['type'] == 'mouse':
-                mouse.position = (int(action['x']), int(action['y']))
-                act = action['action']
-                if act == 'scroll':
-                    getattr(mouse, action['action'])(action['dx'], action['dy'])
-                elif act == 'press' or act == 'release':
-                    getattr(mouse, action['action'])(action['button'])
-            elif action['type'] == 'keyboard':
-                if getattr(action['key'], 'name', None) not in $unrecord_key:
-                    getattr(keyboard, action['action'])(action['key'])
-            if speed:
-                time.sleep(gtime/speed)
-            action_start_time = action['time']
-if __name__ == '__main__':
-    speed = $speed
-    repeat_times(record_data, speed=speed)
 '''.strip()
 
 
@@ -344,33 +301,26 @@ class recorder_gui:
         threading.Thread(target=self.recorder.start).start()
         self.root.mainloop()
 
+        # 将记录的按键信息封装到文本中
+
     def sync_record(self):
         self.recorder.hook_record_stop('force_stop')
 
+        record_data = self.recorder.record
+        self.clear_txt()
+        self.save_to_json(record_data)
 
-
-        #将记录的按键信息封装到文本中
-        def sync_record(self):
-            self.recorder.hook_record_stop('force_stop')
-
-            unrecord_key = str(list(set(self.recorder.unrecord_key)))
-            record_data = self.recorder.record
-            self.clear_txt()
-            speed = 'None' if self.cbx.get() == 'None' else self.cbx.get()
-            self.save_to_json(record_data, unrecord_key, speed)
-
-        def save_to_json(self, record_data, unrecord_key, speed):
-            timestamp = int(time.time())
-            filename = f"record_data_{timestamp}.json"
-            data = {
-                "record_data": record_data,
-                "unrecord_key": unrecord_key,
-                "speed": speed
-            }
-            with open(filename, "w") as json_file:
-                json.dump(data, json_file, indent=2)
-            print(f"Record data saved to {filename}")
-            print(f"{ os.path.abspath(filename)}")
+    def save_to_json(record_data, unrecord_key):
+        timestamp = int(time.time())
+        filename = f"record_data_{timestamp}.json"
+        data = {
+            "record_data": record_data,
+            # "unrecord_key": unrecord_key,
+        }
+        with open(filename, "w") as json_file:
+            json.dump(data, json_file, indent=2)
+        print(f"Record data saved to {filename}")
+        print(f"{os.path.abspath(filename)}")
 
     def create_warning(self):
         self.clear_txt()
