@@ -308,19 +308,24 @@ class recorder_gui:
 
         record_data = self.recorder.record
         self.clear_txt()
-        self.save_to_json(record_data)
+        self.save_to_json()
 
-    def save_to_json(record_data, unrecord_key):
+    def format_record_data(self, record_data):
+        _filter = lambda string: string.group(0).rsplit(':', 1)[0].replace('<', '') + ','
+        record_data = re.sub(r"'key': <[^\n]+>,", _filter, record_data)
+        record_data = re.sub(r"'button': <[^\n]+>,", _filter, record_data)
+        return record_data
+
+    def save_to_json(self):
         timestamp = int(time.time())
         filename = f"record_data_{timestamp}.json"
-        data = {
-            "record_data": record_data,
-            # "unrecord_key": unrecord_key,
-        }
+        # data = {
+        #     "record_data": record_data,
+        #     # "unrecord_key": unrecord_key,
+        # }
         with open(filename, "w") as json_file:
-            json.dump(data, json_file, indent=2)
+            json.dump(pprint.pformat(self.recorder.record, indent=2, width=200), json_file, indent=2)
         print(f"Record data saved to {filename}")
-        print(f"{os.path.abspath(filename)}")
 
     def create_warning(self):
         self.clear_txt()
