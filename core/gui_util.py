@@ -12,7 +12,7 @@ def find_directx_window():
     """
     def enum_windows_callback(hwnd, lparam):
         class_name = win32gui.GetClassName(hwnd)
-        if class_name == "Panda":  # 替换为实际的DirectX 11窗口类名
+        if class_name == "WinGraphicsWindow0":  # 替换为实际的DirectX 11窗口类名
             process_id = win32process.GetWindowThreadProcessId(hwnd)[1]
             lparam.append((hwnd, process_id))
 
