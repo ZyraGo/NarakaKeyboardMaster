@@ -13,6 +13,7 @@ from pynput.mouse import Controller as mcontroller
 from pynput.keyboard import Key
 from pynput.keyboard import Listener as klistener
 from pynput.keyboard import Controller as kcontroller
+from combo_checker import compare_json
 
 SHIFT_DIFF = False
 
@@ -236,6 +237,7 @@ warning = '''
 
 class recorder_gui:
     def __init__(self):
+        self.generated_file = ''
         self.root = tkinter.Tk()
         self.root.title("键盘鼠标操作录制工具")
         # Button(self.root, text='置顶',command=self.topWin).pack(side=tkinter.TOP, padx=3)
@@ -268,8 +270,11 @@ class recorder_gui:
         Button(self.root, text='生成代码', command=self.sync_record).pack(fill=tkinter.X)
         self.txt = Text(self.root, width=30, height=11, font=self.ft)
         self.txt.pack(fill=tkinter.BOTH, expand=True)
+
+        Button(self.root, text='比较文件', command=self.compare_recorder).pack(fill=tkinter.X)
         global print
         print = self.print
+
         try:
             from idlelib.colorizer import ColorDelegator
             from idlelib.percolator import Percolator
@@ -305,8 +310,6 @@ class recorder_gui:
 
     def sync_record(self):
         self.recorder.hook_record_stop('force_stop')
-
-        record_data = self.recorder.record
         self.clear_txt()
         self.save_to_json()
 
@@ -324,8 +327,11 @@ class recorder_gui:
         #     # "unrecord_key": unrecord_key,
         # }
         with open(filename, "w") as json_file:
-            json.dump(pprint.pformat(self.recorder.record, indent=2, width=200), json_file, indent=2)
+            json.dump(pprint.pformat(self.recorder.record, indent=0, width=200), json_file, indent=2)
+            # json.dump(self.recorder.record, json_file, indent=2)
+
         print(f"Record data saved to {filename}")
+        self.generated_file = filename
 
     def create_warning(self):
         self.clear_txt()
@@ -354,6 +360,13 @@ class recorder_gui:
     def change_shift_diff(self, *a):
         global SHIFT_DIFF
         SHIFT_DIFF = True if self.cbx2.get() == '是' else False
+
+    def compare_recorder(self):
+        current_directory = os.getcwd()
+        a = os.path.join(current_directory, 'target.json')
+        b = os.path.join(current_directory, self.generated_file)
+        result = compare_json(a, b)
+        print(result)
 
 
 def execute():

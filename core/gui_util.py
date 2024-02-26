@@ -28,6 +28,8 @@ def inject_text(hwnd, text):
     # 将文字转换为字节码
     buffer = ctypes.create_unicode_buffer(buffer_size)
     ctypes.windll.user32.SetWindowTextW(hwnd, text)
+    # ctypes.windll.user32.DrawText(hwnd, "aaaaa")
+
 
 def main():
     # 找到DirectX 11窗口
