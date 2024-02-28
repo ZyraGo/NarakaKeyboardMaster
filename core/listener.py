@@ -314,7 +314,7 @@ class recorder_gui:
         self.save_to_json()
 
     def format_record_data(self, record_data):
-        _filter = lambda string: string.group(0).rsplit(':', 1)[0].replace('<', '') + ','
+        _filter = lambda string: string.group(0).rsplit(':', 1)[0].replace('<', '\'') + '\','
         record_data = re.sub(r"'key': <[^\n]+>,", _filter, record_data)
         record_data = re.sub(r"'button': <[^\n]+>,", _filter, record_data)
         return record_data
@@ -327,7 +327,8 @@ class recorder_gui:
         #     # "unrecord_key": unrecord_key,
         # }
         with open(filename, "w") as json_file:
-            json.dump(pprint.pformat(self.recorder.record, indent=0, width=200), json_file, indent=2)
+            json.dump(
+                self.format_record_data(pprint.pformat(self.recorder.record, indent=0, width=200)), json_file, indent=2)
             # json.dump(self.recorder.record, json_file, indent=2)
 
         print(f"Record data saved to {filename}")
